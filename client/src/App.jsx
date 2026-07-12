@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-// import AppShell from './components/AppShell'
+import AppShell from './components/AppShell'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Vehicles from './pages/Vehicles'
@@ -18,7 +18,7 @@ const App = () => {
         <Route path="/login" element={<Login />} />
 
         {/* Authenticated app — everything inside the shell */}
-        {/* <Route element={<AppShell />}> */}
+        <Route element={<AppShell />}>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/vehicles" element={<Vehicles />} />
@@ -27,7 +27,7 @@ const App = () => {
           <Route path="/maintenance" element={<Maintainance />} />
           <Route path="/expenses" element={<Expenses />} />
           <Route path="/reports" element={<Report />} />
-        {/* </Route> */}
+        </Route>
 
         <Route path="*" element={<NotFound />} />
       </Routes>

@@ -1,14 +1,4 @@
-import React from 'react'
 
-const DriverForm = () => {
-  return (
-    <div>
-      
-    </div>
-  )
-}
-
-export default DriverForm
 import { useState } from 'react'
 
 const field =
