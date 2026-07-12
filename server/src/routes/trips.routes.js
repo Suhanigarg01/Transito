@@ -11,21 +11,23 @@ const tripsController = require('../controllers/trips.controller');
 const router = Router();
 router.use(authenticate);
 
+// Reads stay open (managers/analysts monitor trips); the whole trip lifecycle —
+// create, dispatch, complete, cancel — belongs to the Driver role.
 router.get('/', tripsController.list);
 router.get('/:id', tripsController.getOne);
-router.post('/', authorize('FLEET_MANAGER'), validateBody(createTripSchema), tripsController.create);
+router.post('/', authorize('DRIVER'), validateBody(createTripSchema), tripsController.create);
 router.post(
   '/:id/dispatch',
-  authorize('FLEET_MANAGER'),
+  authorize('DRIVER'),
   validateBody(dispatchTripSchema),
   tripsController.dispatch
 );
 router.post(
   '/:id/complete',
-  authorize('FLEET_MANAGER', 'DRIVER'),
+  authorize('DRIVER'),
   validateBody(completeTripSchema),
   tripsController.complete
 );
-router.post('/:id/cancel', authorize('FLEET_MANAGER'), tripsController.cancel);
+router.post('/:id/cancel', authorize('DRIVER'), tripsController.cancel);
 
 module.exports = router;

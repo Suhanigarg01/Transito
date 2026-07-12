@@ -7,7 +7,8 @@ const maintenanceController = require('../controllers/maintenance.controller');
 const router = Router();
 router.use(authenticate);
 
-router.get('/', maintenanceController.list);
+// Fleet Manager owns maintenance; Financial Analyst may read to review costs.
+router.get('/', authorize('FLEET_MANAGER', 'FINANCIAL_ANALYST'), maintenanceController.list);
 router.post('/', authorize('FLEET_MANAGER'), validateBody(maintenanceSchema), maintenanceController.create);
 router.put('/:id', authorize('FLEET_MANAGER'), validateBody(maintenanceSchema), maintenanceController.update);
 router.post('/:id/close', authorize('FLEET_MANAGER'), maintenanceController.close);

@@ -1,5 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import { getCurrentUser, logout } from '../api/auth.api'
+import { canAccessPage } from '../auth/permissions'
 import {
   DashboardIcon,
   VehiclesIcon,
@@ -52,6 +53,9 @@ const SidebarBody = ({ onNavigate }) => {
   const navigate = useNavigate()
   const user = getCurrentUser()
 
+  // Only surface the pages this role is allowed to open.
+  const navItems = NAV.filter((item) => canAccessPage(user?.role, item.to))
+
   const handleLogout = () => {
     logout()
     onNavigate?.()
@@ -68,7 +72,7 @@ const SidebarBody = ({ onNavigate }) => {
       <p className="px-3 pb-2 pt-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-stone-400">
         Operations
       </p>
-      {NAV.map((item) => (
+      {navItems.map((item) => (
         <NavLink key={item.to} to={item.to} className={linkClass} onClick={onNavigate}>
           {({ isActive }) => (
             <>

@@ -33,7 +33,20 @@ function create(body) {
   const source = body.source || body.origin;
   if (!source) throw ApiError.badRequest('origin/source is required');
 
+  const cargoWeight = body.cargoWeight || 0;
+
   return prisma.$transaction(async (tx) => {
+    // If a vehicle is assigned up front, the cargo must fit its capacity.
+    if (body.vehicleId) {
+      const vehicle = await tx.vehicle.findUnique({ where: { id: body.vehicleId } });
+      if (!vehicle) throw ApiError.badRequest('Vehicle not found');
+      if (cargoWeight > vehicle.maxLoadCapacity) {
+        throw ApiError.badRequest(
+          `Cargo weight (${cargoWeight} kg) exceeds ${vehicle.registrationNumber}'s capacity (${vehicle.maxLoadCapacity} kg)`
+        );
+      }
+    }
+
     const reference = await nextReference(tx);
     return tx.trip.create({
       data: {
@@ -64,12 +77,20 @@ function dispatch(id, { vehicleId, driverId }) {
 
     const vehicle = await tx.vehicle.findUnique({ where: { id: vehicleId } });
     if (!vehicle) throw ApiError.badRequest('Vehicle not found');
+    // Blocks RETIRED / IN_SHOP / ON_TRIP vehicles (only AVAILABLE may dispatch).
     if (vehicle.status !== 'AVAILABLE') {
       throw ApiError.conflict(`Vehicle ${vehicle.registrationNumber} is not available (${vehicle.status})`);
+    }
+    // Cargo must not exceed the assigned vehicle's maximum load capacity.
+    if (trip.cargoWeight > vehicle.maxLoadCapacity) {
+      throw ApiError.badRequest(
+        `Cargo weight (${trip.cargoWeight} kg) exceeds ${vehicle.registrationNumber}'s capacity (${vehicle.maxLoadCapacity} kg)`
+      );
     }
 
     const driver = await tx.driver.findUnique({ where: { id: driverId } });
     if (!driver) throw ApiError.badRequest('Driver not found');
+    // Blocks SUSPENDED / OFF_DUTY / ON_TRIP drivers (only AVAILABLE may dispatch).
     if (driver.status !== 'AVAILABLE') {
       throw ApiError.conflict(`Driver ${driver.name} is not available (${driver.status})`);
     }

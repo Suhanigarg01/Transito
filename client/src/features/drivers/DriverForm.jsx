@@ -5,14 +5,17 @@ const field =
   'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500'
 const label = 'block text-sm font-medium text-gray-700'
 
-const DRIVER_STATUSES = ['Available', 'On Trip', 'Off Duty']
+const DRIVER_STATUSES = ['Available', 'On Trip', 'Off Duty', 'Suspended']
+const LICENSE_CATEGORIES = ['LMV', 'HMV', 'HTV', 'MCWG', 'Trailer']
 
 
 const empty = {
   name: '',
   licenseNumber: '',
+  licenseCategory: 'LMV',
   licenseExpiry: '',
   phone: '',
+  safetyScore: '',
   status: 'Available',
 }
 
@@ -23,7 +26,12 @@ const DriverForm = ({ initialValues, onSubmit, onCancel, submitting = false }) =
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    onSubmit?.(values)
+    onSubmit?.({
+      ...values,
+      safetyScore: values.safetyScore === '' || values.safetyScore == null
+        ? undefined
+        : Number(values.safetyScore),
+    })
   }
 
   return (
@@ -40,16 +48,30 @@ const DriverForm = ({ initialValues, onSubmit, onCancel, submitting = false }) =
             onChange={set('licenseNumber')} required />
         </div>
         <div className="space-y-1.5">
-          <label className={label}>Licence expiry</label>
-          <input type="date" className={field} value={values.licenseExpiry}
-            onChange={set('licenseExpiry')} required />
+          <label className={label}>Licence category</label>
+          <select className={field} value={values.licenseCategory} onChange={set('licenseCategory')}>
+            {LICENSE_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
+          <label className={label}>Licence expiry</label>
+          <input type="date" className={field} value={values.licenseExpiry}
+            onChange={set('licenseExpiry')} required />
+        </div>
+        <div className="space-y-1.5">
           <label className={label}>Phone</label>
           <input className={field} value={values.phone} onChange={set('phone')} />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="space-y-1.5">
+          <label className={label}>Safety score (0–100)</label>
+          <input type="number" min="0" max="100" className={field}
+            value={values.safetyScore} onChange={set('safetyScore')} />
         </div>
         <div className="space-y-1.5">
           <label className={label}>Status</label>

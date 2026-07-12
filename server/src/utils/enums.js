@@ -21,6 +21,7 @@ const DRIVER_STATUS_LABELS = {
   AVAILABLE: 'Available',
   ON_TRIP: 'On Trip',
   OFF_DUTY: 'Off Duty',
+  SUSPENDED: 'Suspended',
 };
 
 const TRIP_STATUS_LABELS = {

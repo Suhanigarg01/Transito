@@ -65,11 +65,14 @@ const Dashboard = () => {
       color: VEHICLE_STATUS_COLORS[label] || '#78716c',
     }))
 
+    const available = Number(counts['Available']) || 0
+    const inShop = Number(counts['In Shop']) || 0
+
     const kpis = [
-      { label: 'Active Vehicles', value: total - (Number(counts['In Shop']) || 0), sublabel: 'in service', trend: 4 },
-      { label: 'Fleet Utilisation', value: `${utilisation}%`, sublabel: 'of fleet on trips', trend: 6 },
+      { label: 'Active Vehicles', value: total - inShop, sublabel: 'in service' },
+      { label: 'Available Vehicles', value: available, sublabel: 'ready to dispatch' },
+      { label: 'In Maintenance', value: inShop, sublabel: 'in the shop' },
       { label: 'Active Trips', value: summary.trips?.active ?? 0, sublabel: 'dispatched now' },
-      { label: 'Pending Trips', value: summary.trips?.pending ?? 0, sublabel: 'awaiting dispatch', trend: -2 },
     ].map((kpi, i) => ({ ...kpi, Icon: KPI_ICONS[i] }))
 
     return { total, onTrip, utilisation, statusData, kpis }

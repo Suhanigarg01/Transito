@@ -25,7 +25,9 @@ const DriverTable = ({ drivers = [], onEdit, onDelete, loading = false }) => {
             <tr>
               <th className={th}>Driver</th>
               <th className={th}>Licence No.</th>
+              <th className={th}>Category</th>
               <th className={th}>Licence Expiry</th>
+              <th className={`${th} text-right`}>Safety</th>
               <th className={th}>Phone</th>
               <th className={th}>Status</th>
               <th className={`${th} text-right`}>Actions</th>
@@ -33,9 +35,9 @@ const DriverTable = ({ drivers = [], onEdit, onDelete, loading = false }) => {
           </thead>
           <tbody className="divide-y divide-stone-100">
             {loading ? (
-              <tr><td className={`${td} text-center text-stone-400`} colSpan={6}>Loading…</td></tr>
+              <tr><td className={`${td} text-center text-stone-400`} colSpan={8}>Loading…</td></tr>
             ) : drivers.length === 0 ? (
-              <tr><td className={`${td} text-center text-stone-400`} colSpan={6}>No drivers yet</td></tr>
+              <tr><td className={`${td} text-center text-stone-400`} colSpan={8}>No drivers yet</td></tr>
             ) : (
               drivers.map((d) => (
                 <tr key={d.id} className="transition-colors hover:bg-stone-50/70">
@@ -48,7 +50,11 @@ const DriverTable = ({ drivers = [], onEdit, onDelete, loading = false }) => {
                     </div>
                   </td>
                   <td className={`${td} tabular-nums`}>{d.licenseNumber}</td>
+                  <td className={td}>{d.licenseCategory || '—'}</td>
                   <td className={td}><LicenseExpiryTag expiryDate={d.licenseExpiry} /></td>
+                  <td className={`${td} text-right tabular-nums`}>
+                    {d.safetyScore != null ? Math.round(d.safetyScore) : '—'}
+                  </td>
                   <td className={`${td} tabular-nums`}>{d.phone || '—'}</td>
                   <td className={td}><StatusBadge status={d.status} /></td>
                   <td className={`${td} text-right whitespace-nowrap`}>

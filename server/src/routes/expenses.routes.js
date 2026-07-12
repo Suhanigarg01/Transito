@@ -7,9 +7,10 @@ const expensesController = require('../controllers/expenses.controller');
 const router = Router();
 router.use(authenticate);
 
-router.get('/', expensesController.list);
-router.post('/', authorize('FLEET_MANAGER', 'FINANCIAL_ANALYST'), validateBody(expenseSchema), expensesController.create);
-router.put('/:id', authorize('FLEET_MANAGER', 'FINANCIAL_ANALYST'), validateBody(expenseSchema), expensesController.update);
-router.delete('/:id', authorize('FLEET_MANAGER', 'FINANCIAL_ANALYST'), expensesController.remove);
+// Expenses / fuel logs are the Financial Analyst's domain end to end.
+router.get('/', authorize('FINANCIAL_ANALYST'), expensesController.list);
+router.post('/', authorize('FINANCIAL_ANALYST'), validateBody(expenseSchema), expensesController.create);
+router.put('/:id', authorize('FINANCIAL_ANALYST'), validateBody(expenseSchema), expensesController.update);
+router.delete('/:id', authorize('FINANCIAL_ANALYST'), expensesController.remove);
 
 module.exports = router;

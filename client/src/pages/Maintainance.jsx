@@ -11,13 +11,19 @@ import {
   deleteMaintenance,
 } from '../api/maintenance.api'
 import { listVehicles } from '../api/vehicles.api'
+import { getCurrentUser } from '../api/auth.api'
+import { can } from '../auth/permissions'
 
 /**
  * Maintenance page. Backed by /api/maintenance. Creating an "Open" record moves
  * the vehicle to "In Shop"; closing it frees the vehicle — the backend performs
  * those cascades, so we refresh the vehicle list after a close.
+ *
+ * The Fleet Manager manages records; a Financial Analyst opens this page in a
+ * read-only mode to review maintenance costs.
  */
 const Maintainance = () => {
+  const canManage = can(getCurrentUser()?.role, 'maintenance.manage')
   const [records, setRecords] = useState([])
   const [vehicles, setVehicles] = useState([])
   const [loading, setLoading] = useState(true)
@@ -101,12 +107,14 @@ const Maintainance = () => {
         title="Maintenance"
         description={`${openCount} vehicles currently in the shop and out of service.`}
       >
-        <button
-          onClick={openCreate}
-          className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#26406b]"
-        >
-          + Log maintenance
-        </button>
+        {canManage && (
+          <button
+            onClick={openCreate}
+            className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#26406b]"
+          >
+            + Log maintenance
+          </button>
+        )}
       </PageHeader>
 
       {error && (
@@ -123,6 +131,7 @@ const Maintainance = () => {
           onClose={handleClose}
           onEdit={openEdit}
           onDelete={handleDelete}
+          readOnly={!canManage}
         />
       )}
 

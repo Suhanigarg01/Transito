@@ -7,10 +7,13 @@ const driversController = require('../controllers/drivers.controller');
 const router = Router();
 router.use(authenticate);
 
+// Reads stay open to any authenticated user (drivers must appear in the
+// dispatcher's assignment dropdowns). Managing driver compliance — creating,
+// editing and removing driver records — is the Safety Officer's remit.
 router.get('/', driversController.list);
 router.get('/:id', driversController.getOne);
-router.post('/', authorize('FLEET_MANAGER', 'SAFETY_OFFICER'), validateBody(driverSchema), driversController.create);
-router.put('/:id', authorize('FLEET_MANAGER', 'SAFETY_OFFICER'), validateBody(driverSchema), driversController.update);
-router.delete('/:id', authorize('FLEET_MANAGER'), driversController.remove);
+router.post('/', authorize('SAFETY_OFFICER'), validateBody(driverSchema), driversController.create);
+router.put('/:id', authorize('SAFETY_OFFICER'), validateBody(driverSchema), driversController.update);
+router.delete('/:id', authorize('SAFETY_OFFICER'), driversController.remove);
 
 module.exports = router;

@@ -5,6 +5,7 @@ const reportsController = require('../controllers/reports.controller');
 const router = Router();
 router.use(authenticate);
 
-router.get('/', authorize('FLEET_MANAGER', 'FINANCIAL_ANALYST'), reportsController.roi);
+// Profitability / ROI analytics are limited to the Financial Analyst.
+router.get('/', authorize('FINANCIAL_ANALYST'), reportsController.roi);
 
 module.exports = router;

@@ -18,6 +18,7 @@ const STATUS = {
   Open: ['#d98324', 'bg-amber-50 text-amber-700 ring-amber-600/20'],
   // red — terminal negative
   Cancelled: ['#d03b3b', 'bg-red-50 text-red-700 ring-red-600/20'],
+  Suspended: ['#d03b3b', 'bg-red-50 text-red-700 ring-red-600/20'],
   // neutral — idle
   'Off Duty': ['#78716c', 'bg-stone-100 text-stone-600 ring-stone-500/20'],
   Draft: ['#78716c', 'bg-stone-100 text-stone-600 ring-stone-500/20'],
