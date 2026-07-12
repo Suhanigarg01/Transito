@@ -1,0 +1,210 @@
+// TransitOps — Prisma schema
+// Database: PostgreSQL on Neon (serverless). ORM: Prisma.
+//
+// DATABASE_URL  -> pooled connection (runtime queries)
+// DIRECT_URL    -> direct connection (migrations)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum Role {
+  FLEET_MANAGER
+  DRIVER
+  SAFETY_OFFICER
+  FINANCIAL_ANALYST
+}
+
+enum VehicleType {
+  TRUCK
+  VAN
+  BUS
+  CAR
+  TRAILER
+}
+
+enum VehicleStatus {
+  AVAILABLE
+  ON_TRIP
+  IN_SHOP
+  RETIRED
+}
+
+enum DriverStatus {
+  AVAILABLE
+  ON_TRIP
+  OFF_DUTY
+}
+
+enum TripStatus {
+  DRAFT
+  DISPATCHED
+  COMPLETED
+  CANCELLED
+}
+
+enum MaintenanceType {
+  ROUTINE_SERVICE
+  REPAIR
+  INSPECTION
+  TYRE
+  BODYWORK
+  OTHER
+}
+
+enum MaintenanceStatus {
+  OPEN
+  CLOSED
+}
+
+enum ExpenseType {
+  FUEL
+  TOLL
+  PARKING
+  FINE
+  OTHER
+}
+
+// ---------------------------------------------------------------------------
+// Models
+// ---------------------------------------------------------------------------
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String // bcrypt hash
+  name      String
+  role      Role     @default(FLEET_MANAGER)
+  active    Boolean  @default(true)
+
+  // Optional 1:1 link to a driver record (for users whose role is DRIVER).
+  driver    Driver?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([role])
+}
+
+model Vehicle {
+  id                 String        @id @default(cuid())
+  registrationNumber String        @unique
+  name               String // name / model, e.g. "Tata LPT 1613"
+  type               VehicleType   @default(TRUCK)
+  maxLoadCapacity    Float         @default(0) // kg
+  odometer           Int           @default(0) // km
+  acquisitionCost    Float         @default(0)
+  status             VehicleStatus @default(AVAILABLE)
+
+  trips           Trip[]
+  maintenanceLogs MaintenanceLog[]
+  expenses        Expense[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([type])
+}
+
+model Driver {
+  id              String       @id @default(cuid())
+  name            String
+  licenseNumber   String       @unique
+  licenseCategory String       @default("LMV") // LMV / HMV / HTV etc.
+  licenseExpiry   DateTime
+  contactNumber   String?
+  safetyScore     Float        @default(100) // 0–100
+  status          DriverStatus @default(AVAILABLE)
+
+  // Optional link back to the login account for this driver.
+  userId String? @unique
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  trips Trip[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+}
+
+model Trip {
+  id            String     @id @default(cuid())
+  reference     String     @unique // e.g. TRP-1042
+  source        String
+  destination   String
+  cargoWeight   Float      @default(0) // kg
+  plannedDistance Float    @default(0) // km
+  revenue       Float      @default(0) // fare / billed amount — feeds ROI report
+  status        TripStatus @default(DRAFT)
+
+  vehicleId String?
+  vehicle   Vehicle? @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+
+  driverId String?
+  driver   Driver? @relation(fields: [driverId], references: [id], onDelete: SetNull)
+
+  // Lifecycle / odometer capture
+  scheduledAt   DateTime?
+  dispatchedAt  DateTime?
+  completedAt   DateTime?
+  cancelledAt   DateTime?
+  startOdometer Int?
+  endOdometer   Int?
+  actualDistance Float?
+  notes         String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([vehicleId])
+  @@index([driverId])
+}
+
+model MaintenanceLog {
+  id          String            @id @default(cuid())
+  vehicleId   String
+  vehicle     Vehicle           @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  type        MaintenanceType   @default(REPAIR)
+  description String?
+  cost        Float             @default(0)
+  serviceDate DateTime          @default(now())
+  status      MaintenanceStatus @default(OPEN)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([vehicleId])
+  @@index([status])
+}
+
+model Expense {
+  id        String      @id @default(cuid())
+  vehicleId String
+  vehicle   Vehicle     @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  type      ExpenseType @default(FUEL)
+  amount    Float       @default(0) // cost
+  liters    Float? // only for FUEL
+  odometer  Int? // odometer at fill
+  date      DateTime    @default(now())
+  notes     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([vehicleId])
+  @@index([type])
+  @@index([date])
+}
