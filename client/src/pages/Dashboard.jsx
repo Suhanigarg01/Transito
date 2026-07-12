@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { getDashboardSummary } from '../api/dashboard.api'
 import KpiGrid from '../features/dashboard/KpiGrid'
 import FleetUtilisationChart from '../features/dashboard/FleetUtilisationChart'
 import StatusPieChart from '../features/dashboard/StatusPieChart'
@@ -12,26 +13,12 @@ import { VehiclesIcon, GaugeIcon, TripsIcon, ClockIcon } from '../components/ico
  * the most recent trips.
  *
  * Data flow: a single `summary` object drives every widget so the numbers stay
- * consistent. Swap the mock loader in the effect for a real API call
- * (GET /api/dashboard/summary) — the shape below is the contract.
+ * consistent. Loaded from GET /api/dashboard/summary.
  */
 const VEHICLE_STATUS_COLORS = {
   Available: '#0ca30c',
   'On Trip': '#2f4a7a',
   'In Shop': '#d98324',
-}
-
-// Placeholder payload — matches the expected GET /api/dashboard/summary shape.
-const MOCK_SUMMARY = {
-  vehicles: { Available: 12, 'On Trip': 6, 'In Shop': 2 },
-  trips: { active: 6, pending: 3 },
-  recentTrips: [
-    { id: 1, reference: 'TRP-1042', route: 'Depot A → Riverside', vehicle: 'MH-12-AB-1234', status: 'Dispatched' },
-    { id: 2, reference: 'TRP-1041', route: 'Warehouse → Airport', vehicle: 'MH-14-CD-9911', status: 'Completed' },
-    { id: 3, reference: 'TRP-1040', route: 'Depot B → Downtown', vehicle: 'MH-12-EF-5522', status: 'Completed' },
-    { id: 4, reference: 'TRP-1039', route: 'Riverside → Depot A', vehicle: '—', status: 'Draft' },
-    { id: 5, reference: 'TRP-1038', route: 'Airport → Warehouse', vehicle: 'MH-01-GH-7788', status: 'Cancelled' },
-  ],
 }
 
 const STATUS_DOT = {
@@ -46,16 +33,20 @@ const KPI_ICONS = [VehiclesIcon, GaugeIcon, TripsIcon, ClockIcon]
 const Dashboard = () => {
   const [summary, setSummary] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     let active = true
-    // Replace with: fetch('/api/dashboard/summary').then(r => r.json())
-    Promise.resolve(MOCK_SUMMARY).then((data) => {
-      if (active) {
-        setSummary(data)
-        setLoading(false)
-      }
-    })
+    getDashboardSummary()
+      .then((data) => {
+        if (active) setSummary(data)
+      })
+      .catch((err) => {
+        if (active) setError(err.message)
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
     return () => {
       active = false
     }
@@ -83,6 +74,16 @@ const Dashboard = () => {
 
     return { total, onTrip, utilisation, statusData, kpis }
   }, [summary])
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          Couldn’t load the dashboard: {error}
+        </div>
+      </div>
+    )
+  }
 
   if (loading || !derived) {
     return (

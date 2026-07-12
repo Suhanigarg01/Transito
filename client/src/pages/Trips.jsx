@@ -1,82 +1,133 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import TripTable from '../features/trips/TripTable'
 import TripForm from '../features/trips/TripForm'
 import DispatchPanel from '../features/trips/DispatchPanel'
 import CompleteTripModal from '../features/trips/CompleteTripModal'
 import Modal from '../components/Modal'
 import PageHeader from '../components/PageHeader'
+import {
+  listTrips,
+  createTrip,
+  dispatchTrip,
+  completeTrip,
+  cancelTrip,
+} from '../api/trips.api'
+import { listVehicles } from '../api/vehicles.api'
+import { listDrivers } from '../api/drivers.api'
 
 /**
- * Trip management page. Enforces the lifecycle client-side for the demo:
+ * Trip management page. Backed by /api/trips. The lifecycle transitions are
+ * dedicated endpoints; the backend cascades vehicle/driver status, so we simply
+ * replace the affected trip with the presented record it returns.
+ *
  *   Draft --dispatch--> Dispatched --complete--> Completed
  *        \--cancel--> Cancelled            \--cancel--> Cancelled
- * The backend performs the real transition + cascades vehicle/driver status.
  */
-const AVAILABLE_VEHICLES = [
-  { id: 1, regNumber: 'MH-12-AB-1234' },
-  { id: 4, regNumber: 'MH-01-GH-7788' },
-]
-const AVAILABLE_DRIVERS = [
-  { id: 1, name: 'Ramesh Kumar' },
-  { id: 3, name: 'Anita Desai' },
-]
-
-const SEED = [
-  { id: 1, reference: 'TRP-1042', origin: 'Depot A', destination: 'Riverside', vehicle: 'MH-14-CD-9911', driver: 'Suresh Patil', status: 'Dispatched', startOdometer: 41230 },
-  { id: 2, reference: 'TRP-1041', origin: 'Warehouse', destination: 'Airport', vehicle: 'MH-12-EF-5522', driver: 'Vijay Singh', status: 'Completed' },
-  { id: 3, reference: 'TRP-1039', origin: 'Riverside', destination: 'Depot A', vehicle: '', driver: '', status: 'Draft' },
-]
-
 const Trips = () => {
-  const [trips, setTrips] = useState(SEED)
+  const [trips, setTrips] = useState([])
+  const [vehicles, setVehicles] = useState([])
+  const [drivers, setDrivers] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
   const [createOpen, setCreateOpen] = useState(false)
   const [dispatching, setDispatching] = useState(null)
   const [completing, setCompleting] = useState(null)
 
-  const setStatus = (id, changes) =>
-    setTrips((list) => list.map((t) => (t.id === id ? { ...t, ...changes } : t)))
+  useEffect(() => {
+    let active = true
+    Promise.all([listTrips(), listVehicles(), listDrivers()])
+      .then(([t, v, d]) => {
+        if (!active) return
+        setTrips(t)
+        setVehicles(v)
+        setDrivers(d)
+      })
+      .catch((err) => active && setError(err.message))
+      .finally(() => active && setLoading(false))
+    return () => {
+      active = false
+    }
+  }, [])
 
-  const handleCreate = (values) => {
-    // Replace with POST /api/trips (server assigns reference + Draft status)
-    const vehicle = AVAILABLE_VEHICLES.find((v) => String(v.id) === String(values.vehicleId))
-    const driver = AVAILABLE_DRIVERS.find((d) => String(d.id) === String(values.driverId))
-    setTrips((list) => [
-      ...list,
-      {
-        id: Date.now(),
-        reference: `TRP-${1043 + list.length}`,
-        origin: values.origin,
-        destination: values.destination,
-        vehicle: vehicle?.regNumber || '',
-        driver: driver?.name || '',
-        status: 'Draft',
-      },
-    ])
-    setCreateOpen(false)
+  // Only free vehicles/drivers can be assigned at create/dispatch time.
+  const availableVehicles = useMemo(
+    () => vehicles.filter((v) => v.status === 'Available'),
+    [vehicles],
+  )
+  const availableDrivers = useMemo(
+    () => drivers.filter((d) => d.status === 'Available'),
+    [drivers],
+  )
+
+  const replaceTrip = (trip) =>
+    setTrips((list) => list.map((t) => (t.id === trip.id ? trip : t)))
+
+  // After a transition, vehicle/driver availability changes server-side too;
+  // refresh those lists so the dropdowns stay accurate.
+  const refreshFleet = () => {
+    Promise.all([listVehicles(), listDrivers()])
+      .then(([v, d]) => {
+        setVehicles(v)
+        setDrivers(d)
+      })
+      .catch(() => {})
   }
 
-  const handleDispatch = ({ tripId, vehicleId, driverId }) => {
-    // Replace with POST /api/trips/:id/dispatch
-    const vehicle = AVAILABLE_VEHICLES.find((v) => String(v.id) === String(vehicleId))
-    const driver = AVAILABLE_DRIVERS.find((d) => String(d.id) === String(driverId))
-    setStatus(tripId, {
-      status: 'Dispatched',
-      vehicle: vehicle?.regNumber || '',
-      driver: driver?.name || '',
-    })
-    setDispatching(null)
+  const handleCreate = async (values) => {
+    setSubmitting(true)
+    setError('')
+    try {
+      const created = await createTrip(values)
+      setTrips((list) => [created, ...list])
+      setCreateOpen(false)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSubmitting(false)
+    }
   }
 
-  const handleComplete = ({ tripId, endOdometer, notes }) => {
-    // Replace with POST /api/trips/:id/complete
-    setStatus(tripId, { status: 'Completed', endOdometer, notes })
-    setCompleting(null)
+  const handleDispatch = async ({ tripId, vehicleId, driverId }) => {
+    setSubmitting(true)
+    setError('')
+    try {
+      const trip = await dispatchTrip(tripId, { vehicleId, driverId })
+      replaceTrip(trip)
+      refreshFleet()
+      setDispatching(null)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSubmitting(false)
+    }
   }
 
-  const handleCancel = (trip) => {
-    // Replace with POST /api/trips/:id/cancel
-    if (window.confirm(`Cancel ${trip.reference}?`)) {
-      setStatus(trip.id, { status: 'Cancelled' })
+  const handleComplete = async ({ tripId, endOdometer, notes }) => {
+    setSubmitting(true)
+    setError('')
+    try {
+      const trip = await completeTrip(tripId, { endOdometer, notes })
+      replaceTrip(trip)
+      refreshFleet()
+      setCompleting(null)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleCancel = async (trip) => {
+    if (!window.confirm(`Cancel ${trip.reference}?`)) return
+    setError('')
+    try {
+      const updated = await cancelTrip(trip.id)
+      replaceTrip(updated)
+      refreshFleet()
+    } catch (err) {
+      setError(err.message)
     }
   }
 
@@ -95,20 +146,31 @@ const Trips = () => {
         </button>
       </PageHeader>
 
-      <TripTable
-        trips={trips}
-        onDispatch={(t) => setDispatching(t)}
-        onComplete={(t) => setCompleting(t)}
-        onCancel={handleCancel}
-      />
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="h-64 animate-pulse rounded-2xl bg-stone-200/50" />
+      ) : (
+        <TripTable
+          trips={trips}
+          onDispatch={(t) => setDispatching(t)}
+          onComplete={(t) => setCompleting(t)}
+          onCancel={handleCancel}
+        />
+      )}
 
       {/* Create trip */}
       <Modal open={createOpen} title="New trip" onClose={() => setCreateOpen(false)}>
         <TripForm
-          vehicles={AVAILABLE_VEHICLES}
-          drivers={AVAILABLE_DRIVERS}
+          vehicles={availableVehicles}
+          drivers={availableDrivers}
           onSubmit={handleCreate}
           onCancel={() => setCreateOpen(false)}
+          submitting={submitting}
         />
       </Modal>
 
@@ -118,10 +180,11 @@ const Trips = () => {
           <div className="w-full max-w-lg">
             <DispatchPanel
               trip={dispatching}
-              vehicles={AVAILABLE_VEHICLES}
-              drivers={AVAILABLE_DRIVERS}
+              vehicles={availableVehicles}
+              drivers={availableDrivers}
               onDispatch={handleDispatch}
               onCancel={() => setDispatching(null)}
+              submitting={submitting}
             />
           </div>
         </div>
@@ -133,6 +196,7 @@ const Trips = () => {
         trip={completing}
         onSubmit={handleComplete}
         onClose={() => setCompleting(null)}
+        submitting={submitting}
       />
     </div>
   )

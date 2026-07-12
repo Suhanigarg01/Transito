@@ -1,13 +1,24 @@
+import { useNavigate } from 'react-router-dom'
 import { MenuIcon, BellIcon, SearchIcon } from './icons'
+import { getCurrentUser, logout } from '../api/auth.api'
 
-/**
- * Top bar: mobile menu trigger, a search field, notifications and the current
- * role. Sticky and translucent so content scrolls under it.
- *
- * Props:
- *  - onMenuClick() : open the mobile sidebar drawer
- */
+const initialsOf = (name = '') =>
+  name
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase())
+    .join('') || 'U'
+
 const Topbar = ({ onMenuClick }) => {
+  const navigate = useNavigate()
+  const user = getCurrentUser()
+
+  const handleLogout = () => {
+    logout()
+    navigate('/login', { replace: true })
+  }
+
   return (
     <header className="sticky top-0 z-20 border-b border-stone-200/70 bg-[var(--color-canvas)]/80 backdrop-blur">
       <div className="flex h-16 items-center gap-3 px-4 sm:px-6">
@@ -40,12 +51,22 @@ const Topbar = ({ onMenuClick }) => {
           </button>
 
           <span className="hidden rounded-full border border-stone-200 bg-white/70 px-3 py-1 text-xs font-medium text-stone-600 sm:inline">
-            Fleet Manager
+            {user?.roleLabel || 'Fleet Manager'}
           </span>
 
-          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--color-accent)] text-xs font-semibold text-white">
-            AM
+          <span
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--color-accent)] text-xs font-semibold text-white"
+            title={user?.name || ''}
+          >
+            {initialsOf(user?.name)}
           </span>
+
+          <button
+            onClick={handleLogout}
+            className="hidden rounded-md border border-stone-200 bg-white/70 px-3 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-100 sm:inline"
+          >
+            Sign out
+          </button>
         </div>
       </div>
     </header>

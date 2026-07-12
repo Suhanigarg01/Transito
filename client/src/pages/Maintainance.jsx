@@ -1,31 +1,45 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import MaintainanceTable from '../features/maintainance/MaintainanceTable'
 import MaintainanceForm from '../features/maintainance/MaintainanceForm'
 import Modal from '../components/Modal'
 import PageHeader from '../components/PageHeader'
+import {
+  listMaintenance,
+  createMaintenance,
+  updateMaintenance,
+  closeMaintenance,
+  deleteMaintenance,
+} from '../api/maintenance.api'
+import { listVehicles } from '../api/vehicles.api'
 
 /**
- * Maintenance page. An "Open" record marks the vehicle "In Shop"; closing it
- * (onClose) frees the vehicle back to "Available" — the backend performs that
- * cascade. Local state stands in for /api/maintenance.
+ * Maintenance page. Backed by /api/maintenance. Creating an "Open" record moves
+ * the vehicle to "In Shop"; closing it frees the vehicle — the backend performs
+ * those cascades, so we refresh the vehicle list after a close.
  */
-const VEHICLES = [
-  { id: 1, regNumber: 'MH-12-AB-1234' },
-  { id: 2, regNumber: 'MH-14-CD-9911' },
-  { id: 3, regNumber: 'MH-12-EF-5522' },
-  { id: 4, regNumber: 'MH-01-GH-7788' },
-]
-
-const SEED = [
-  { id: 1, vehicleId: 3, vehicle: 'MH-12-EF-5522', type: 'Repair', description: 'Clutch replacement', cost: 18500, serviceDate: '2026-07-08', status: 'Open' },
-  { id: 2, vehicleId: 1, vehicle: 'MH-12-AB-1234', type: 'Routine Service', description: '80k km service', cost: 6200, serviceDate: '2026-06-20', status: 'Closed' },
-  { id: 3, vehicleId: 4, vehicle: 'MH-01-GH-7788', type: 'Tyre', description: '4 x front tyres', cost: 24000, serviceDate: '2026-05-30', status: 'Closed' },
-]
-
 const Maintainance = () => {
-  const [records, setRecords] = useState(SEED)
+  const [records, setRecords] = useState([])
+  const [vehicles, setVehicles] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    Promise.all([listMaintenance(), listVehicles()])
+      .then(([m, v]) => {
+        if (!active) return
+        setRecords(m)
+        setVehicles(v)
+      })
+      .catch((err) => active && setError(err.message))
+      .finally(() => active && setLoading(false))
+    return () => {
+      active = false
+    }
+  }, [])
 
   const openCreate = () => {
     setEditing(null)
@@ -37,37 +51,55 @@ const Maintainance = () => {
     setModalOpen(true)
   }
 
-  const handleSubmit = (values) => {
-    // Replace with POST /api/maintenance or PUT /api/maintenance/:id
-    const vehicle = VEHICLES.find((v) => String(v.id) === String(values.vehicleId))
-    const row = { ...values, vehicle: vehicle?.regNumber || '' }
-    if (editing) {
-      setRecords((list) => list.map((r) => (r.id === editing.id ? { ...r, ...row } : r)))
-    } else {
-      setRecords((list) => [...list, { ...row, id: Date.now() }])
+  const handleSubmit = async (values) => {
+    setSubmitting(true)
+    setError('')
+    try {
+      if (editing) {
+        const updated = await updateMaintenance(editing.id, values)
+        setRecords((list) => list.map((r) => (r.id === editing.id ? updated : r)))
+      } else {
+        const created = await createMaintenance(values)
+        setRecords((list) => [created, ...list])
+      }
+      setModalOpen(false)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSubmitting(false)
     }
-    setModalOpen(false)
   }
 
-  const handleClose = (record) => {
-    // Replace with POST /api/maintenance/:id/close (frees the vehicle)
-    setRecords((list) => list.map((r) => (r.id === record.id ? { ...r, status: 'Closed' } : r)))
+  const handleClose = async (record) => {
+    setError('')
+    try {
+      const updated = await closeMaintenance(record.id)
+      setRecords((list) => list.map((r) => (r.id === record.id ? updated : r)))
+      listVehicles().then(setVehicles).catch(() => {})
+    } catch (err) {
+      setError(err.message)
+    }
   }
 
-  const handleDelete = (record) => {
-    if (window.confirm('Delete this maintenance record?')) {
+  const handleDelete = async (record) => {
+    if (!window.confirm('Delete this maintenance record?')) return
+    setError('')
+    try {
+      await deleteMaintenance(record.id)
       setRecords((list) => list.filter((r) => r.id !== record.id))
+    } catch (err) {
+      setError(err.message)
     }
   }
+
+  const openCount = records.filter((r) => r.status === 'Open').length
 
   return (
     <div className="space-y-5 p-6">
       <PageHeader
         eyebrow="Workshop"
         title="Maintenance"
-        description={`${
-          records.filter((r) => r.status === 'Open').length
-        } vehicles currently in the shop and out of service.`}
+        description={`${openCount} vehicles currently in the shop and out of service.`}
       >
         <button
           onClick={openCreate}
@@ -77,12 +109,22 @@ const Maintainance = () => {
         </button>
       </PageHeader>
 
-      <MaintainanceTable
-        records={records}
-        onClose={handleClose}
-        onEdit={openEdit}
-        onDelete={handleDelete}
-      />
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="h-64 animate-pulse rounded-2xl bg-stone-200/50" />
+      ) : (
+        <MaintainanceTable
+          records={records}
+          onClose={handleClose}
+          onEdit={openEdit}
+          onDelete={handleDelete}
+        />
+      )}
 
       <Modal
         open={modalOpen}
@@ -90,10 +132,11 @@ const Maintainance = () => {
         onClose={() => setModalOpen(false)}
       >
         <MaintainanceForm
-          vehicles={VEHICLES}
+          vehicles={vehicles}
           initialValues={editing || undefined}
           onSubmit={handleSubmit}
           onCancel={() => setModalOpen(false)}
+          submitting={submitting}
         />
       </Modal>
     </div>

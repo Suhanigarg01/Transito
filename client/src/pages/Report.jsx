@@ -1,23 +1,11 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import ReportFilter from '../features/reports/ReportFilter'
 import ROITable from '../features/reports/ROITable'
 import CostBreakdownChart from '../features/reports/CostBreakdownChart'
 import ExportCSV from '../features/reports/ExportCSV'
 import PageHeader from '../components/PageHeader'
-
-const VEHICLES = [
-  { id: 1, regNumber: 'MH-12-AB-1234' },
-  { id: 2, regNumber: 'MH-14-CD-9911' },
-  { id: 3, regNumber: 'MH-12-EF-5522' },
-  { id: 4, regNumber: 'MH-01-GH-7788' },
-]
-
-const SEED_ROWS = [
-  { vehicle: 'MH-12-AB-1234', revenue: 142000, fuelCost: 38400, maintenanceCost: 6200, otherCost: 2100, distanceKm: 9800, fuelLitres: 1180 },
-  { vehicle: 'MH-14-CD-9911', revenue: 98000, fuelCost: 29500, maintenanceCost: 0, otherCost: 1600, distanceKm: 7400, fuelLitres: 910 },
-  { vehicle: 'MH-12-EF-5522', revenue: 76000, fuelCost: 33200, maintenanceCost: 18500, otherCost: 900, distanceKm: 6100, fuelLitres: 880 },
-  { vehicle: 'MH-01-GH-7788', revenue: 118000, fuelCost: 41000, maintenanceCost: 24000, otherCost: 3200, distanceKm: 8600, fuelLitres: 1090 },
-]
+import { getRoiReport } from '../api/reports.api'
+import { listVehicles } from '../api/vehicles.api'
 
 const COST_COLORS = {
   Fuel: '#2a78d6',
@@ -25,6 +13,12 @@ const COST_COLORS = {
   'Tolls & Other': '#1baf7a',
 }
 
+/**
+ * Reports & analytics page. Rows come from GET /api/reports (per-vehicle
+ * revenue/cost/distance aggregates); the vehicle + date filters are applied
+ * server-side, so we refetch whenever they change. ROI and fuel-efficiency are
+ * derived here from the raw figures.
+ */
 const Report = () => {
   const [filters, setFilters] = useState({
     reportType: 'roi',
@@ -32,13 +26,42 @@ const Report = () => {
     to: '',
     vehicleId: '',
   })
+  const [rows, setRows] = useState([])
+  const [vehicles, setVehicles] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
-  // Apply the vehicle filter to the working row set.
-  const rows = useMemo(() => {
-    if (!filters.vehicleId) return SEED_ROWS
-    const reg = VEHICLES.find((v) => String(v.id) === String(filters.vehicleId))?.regNumber
-    return SEED_ROWS.filter((r) => r.vehicle === reg)
-  }, [filters.vehicleId])
+  // Vehicle list for the filter dropdown (loaded once).
+  useEffect(() => {
+    listVehicles()
+      .then(setVehicles)
+      .catch((err) => setError(err.message))
+  }, [])
+
+  // Report rows — refetch when the filters change.
+  useEffect(() => {
+    let active = true
+    const load = async () => {
+      setLoading(true)
+      try {
+        const data = await getRoiReport({
+          type: filters.reportType,
+          vehicleId: filters.vehicleId,
+          from: filters.from,
+          to: filters.to,
+        })
+        if (active) setRows(data.rows || [])
+      } catch (err) {
+        if (active) setError(err.message)
+      } finally {
+        if (active) setLoading(false)
+      }
+    }
+    load()
+    return () => {
+      active = false
+    }
+  }, [filters.reportType, filters.vehicleId, filters.from, filters.to])
 
   const costBreakdown = useMemo(() => {
     const totals = rows.reduce(
@@ -92,14 +115,24 @@ const Report = () => {
         <ExportCSV rows={exportRows} columns={exportColumns} filename="fleet-roi.csv" />
       </PageHeader>
 
-      <ReportFilter filters={filters} vehicles={VEHICLES} onChange={setFilters} />
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      <ReportFilter filters={filters} vehicles={vehicles} onChange={setFilters} />
 
       <CostBreakdownChart data={costBreakdown} />
 
       <div>
         <p className="eyebrow">Per vehicle</p>
         <h2 className="mb-3 mt-0.5 text-[15px] font-semibold text-stone-800">Return on Investment</h2>
-        <ROITable rows={rows} />
+        {loading ? (
+          <div className="h-48 animate-pulse rounded-2xl bg-stone-200/50" />
+        ) : (
+          <ROITable rows={rows} />
+        )}
       </div>
     </div>
   )

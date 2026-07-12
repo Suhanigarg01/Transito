@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
-import LoginForm from '../features/auth/LoginForm'
-import { isAuthenticated, login } from '../api/auth.api'
+import SignupForm from '../features/auth/SignupForm'
+import { isAuthenticated, register } from '../api/auth.api'
 
-const Login = () => {
+const Signup = () => {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -11,14 +11,15 @@ const Login = () => {
   // Already signed in? Skip the form.
   if (isAuthenticated()) return <Navigate to="/dashboard" replace />
 
-  const handleLogin = async ({ email, password }) => {
+  const handleSignup = async ({ name, email, password, role }) => {
     setError('')
     setLoading(true)
     try {
-      await login({ email, password })
+      // register() stores the returned token + user, so we're logged straight in.
+      await register({ name, email, password, role })
       navigate('/dashboard')
     } catch (err) {
-      setError(err.message || 'Login failed')
+      setError(err.message || 'Sign up failed')
     } finally {
       setLoading(false)
     }
@@ -35,11 +36,11 @@ const Login = () => {
             Transit<span className="text-[var(--color-accent)]">Ops</span>
           </span>
         </div>
-        <LoginForm onSubmit={handleLogin} loading={loading} error={error} />
+        <SignupForm onSubmit={handleSignup} loading={loading} error={error} />
         <p className="mt-6 text-center text-sm text-stone-500">
-          Don’t have an account?{' '}
-          <Link to="/signup" className="font-medium text-[var(--color-accent)] hover:underline">
-            Sign up
+          Already have an account?{' '}
+          <Link to="/login" className="font-medium text-[var(--color-accent)] hover:underline">
+            Sign in
           </Link>
         </p>
       </div>
@@ -47,4 +48,4 @@ const Login = () => {
   )
 }
 
-export default Login
+export default Signup

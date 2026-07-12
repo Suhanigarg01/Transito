@@ -1,30 +1,43 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import ExpenseTable from '../features/expenses/ExpenseTable'
 import FuelLogForm from '../features/expenses/FuelLogForm'
 import Modal from '../components/Modal'
 import PageHeader from '../components/PageHeader'
+import {
+  listExpenses,
+  createExpense,
+  updateExpense,
+  deleteExpense,
+} from '../api/expenses.api'
+import { listVehicles } from '../api/vehicles.api'
 
 /**
- * Expenses / fuel log page. Feeds the operational-cost and fuel-efficiency
- * reports. Local state stands in for /api/expenses.
+ * Expenses / fuel log page. Backed by /api/expenses. Feeds the operational-cost
+ * and fuel-efficiency reports.
  */
-const VEHICLES = [
-  { id: 1, regNumber: 'MH-12-AB-1234' },
-  { id: 2, regNumber: 'MH-14-CD-9911' },
-  { id: 3, regNumber: 'MH-12-EF-5522' },
-  { id: 4, regNumber: 'MH-01-GH-7788' },
-]
-
-const SEED = [
-  { id: 1, vehicleId: 2, vehicle: 'MH-14-CD-9911', category: 'Fuel', date: '2026-07-10', amount: 5400, litres: 55, odometer: 41230, notes: 'HP Riverside' },
-  { id: 2, vehicleId: 1, vehicle: 'MH-12-AB-1234', category: 'Fuel', date: '2026-07-09', amount: 6100, litres: 62, odometer: 84200, notes: 'IOCL Depot A' },
-  { id: 3, vehicleId: 4, vehicle: 'MH-01-GH-7788', category: 'Toll', date: '2026-07-08', amount: 320, litres: null, odometer: null, notes: 'Expressway' },
-]
-
 const Expenses = () => {
-  const [expenses, setExpenses] = useState(SEED)
+  const [expenses, setExpenses] = useState([])
+  const [vehicles, setVehicles] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    Promise.all([listExpenses(), listVehicles()])
+      .then(([e, v]) => {
+        if (!active) return
+        setExpenses(e)
+        setVehicles(v)
+      })
+      .catch((err) => active && setError(err.message))
+      .finally(() => active && setLoading(false))
+    return () => {
+      active = false
+    }
+  }, [])
 
   const openCreate = () => {
     setEditing(null)
@@ -36,21 +49,33 @@ const Expenses = () => {
     setModalOpen(true)
   }
 
-  const handleSubmit = (values) => {
-    // Replace with POST /api/expenses or PUT /api/expenses/:id
-    const vehicle = VEHICLES.find((v) => String(v.id) === String(values.vehicleId))
-    const row = { ...values, vehicle: vehicle?.regNumber || '' }
-    if (editing) {
-      setExpenses((list) => list.map((e) => (e.id === editing.id ? { ...e, ...row } : e)))
-    } else {
-      setExpenses((list) => [...list, { ...row, id: Date.now() }])
+  const handleSubmit = async (values) => {
+    setSubmitting(true)
+    setError('')
+    try {
+      if (editing) {
+        const updated = await updateExpense(editing.id, values)
+        setExpenses((list) => list.map((e) => (e.id === editing.id ? updated : e)))
+      } else {
+        const created = await createExpense(values)
+        setExpenses((list) => [created, ...list])
+      }
+      setModalOpen(false)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSubmitting(false)
     }
-    setModalOpen(false)
   }
 
-  const handleDelete = (expense) => {
-    if (window.confirm('Delete this expense?')) {
+  const handleDelete = async (expense) => {
+    if (!window.confirm('Delete this expense?')) return
+    setError('')
+    try {
+      await deleteExpense(expense.id)
       setExpenses((list) => list.filter((e) => e.id !== expense.id))
+    } catch (err) {
+      setError(err.message)
     }
   }
 
@@ -69,7 +94,17 @@ const Expenses = () => {
         </button>
       </PageHeader>
 
-      <ExpenseTable expenses={expenses} onEdit={openEdit} onDelete={handleDelete} />
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="h-64 animate-pulse rounded-2xl bg-stone-200/50" />
+      ) : (
+        <ExpenseTable expenses={expenses} onEdit={openEdit} onDelete={handleDelete} />
+      )}
 
       <Modal
         open={modalOpen}
@@ -77,10 +112,11 @@ const Expenses = () => {
         onClose={() => setModalOpen(false)}
       >
         <FuelLogForm
-          vehicles={VEHICLES}
+          vehicles={vehicles}
           initialValues={editing || undefined}
           onSubmit={handleSubmit}
           onCancel={() => setModalOpen(false)}
+          submitting={submitting}
         />
       </Modal>
     </div>

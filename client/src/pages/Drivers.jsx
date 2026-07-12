@@ -1,23 +1,36 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import DriverTable from '../features/drivers/DriverTable'
 import DriverForm from '../features/drivers/DriverForm'
 import Modal from '../components/Modal'
 import PageHeader from '../components/PageHeader'
+import {
+  listDrivers,
+  createDriver,
+  updateDriver,
+  deleteDriver,
+} from '../api/drivers.api'
 
 /**
- * Drivers registry page. Local state stands in for /api/drivers.
+ * Drivers registry page. Backed by /api/drivers.
  */
-const SEED = [
-  { id: 1, name: 'Ramesh Kumar', licenseNumber: 'DL-0420110149646', licenseExpiry: '2027-03-15', phone: '+91 98200 11223', status: 'Available' },
-  { id: 2, name: 'Suresh Patil', licenseNumber: 'MH-1420190004521', licenseExpiry: '2026-08-01', phone: '+91 99870 55412', status: 'On Trip' },
-  { id: 3, name: 'Anita Desai', licenseNumber: 'MH-0120170098712', licenseExpiry: '2026-07-30', phone: '+91 90045 78123', status: 'Available' },
-  { id: 4, name: 'Vijay Singh', licenseNumber: 'DL-0520150031200', licenseExpiry: '2025-12-10', phone: '+91 98115 66200', status: 'Off Duty' },
-]
-
 const Drivers = () => {
-  const [drivers, setDrivers] = useState(SEED)
+  const [drivers, setDrivers] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    listDrivers()
+      .then((data) => active && setDrivers(data))
+      .catch((err) => active && setError(err.message))
+      .finally(() => active && setLoading(false))
+    return () => {
+      active = false
+    }
+  }, [])
 
   const openCreate = () => {
     setEditing(null)
@@ -29,20 +42,33 @@ const Drivers = () => {
     setModalOpen(true)
   }
 
-  const handleSubmit = (values) => {
-    // Replace with POST /api/drivers or PUT /api/drivers/:id
-    if (editing) {
-      setDrivers((list) => list.map((d) => (d.id === editing.id ? { ...d, ...values } : d)))
-    } else {
-      setDrivers((list) => [...list, { ...values, id: Date.now() }])
+  const handleSubmit = async (values) => {
+    setSubmitting(true)
+    setError('')
+    try {
+      if (editing) {
+        const updated = await updateDriver(editing.id, values)
+        setDrivers((list) => list.map((d) => (d.id === editing.id ? updated : d)))
+      } else {
+        const created = await createDriver(values)
+        setDrivers((list) => [created, ...list])
+      }
+      setModalOpen(false)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSubmitting(false)
     }
-    setModalOpen(false)
   }
 
-  const handleDelete = (driver) => {
-    // Replace with DELETE /api/drivers/:id
-    if (window.confirm(`Delete driver ${driver.name}?`)) {
+  const handleDelete = async (driver) => {
+    if (!window.confirm(`Delete driver ${driver.name}?`)) return
+    setError('')
+    try {
+      await deleteDriver(driver.id)
       setDrivers((list) => list.filter((d) => d.id !== driver.id))
+    } catch (err) {
+      setError(err.message)
     }
   }
 
@@ -61,7 +87,17 @@ const Drivers = () => {
         </button>
       </PageHeader>
 
-      <DriverTable drivers={drivers} onEdit={openEdit} onDelete={handleDelete} />
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="h-64 animate-pulse rounded-2xl bg-stone-200/50" />
+      ) : (
+        <DriverTable drivers={drivers} onEdit={openEdit} onDelete={handleDelete} />
+      )}
 
       <Modal
         open={modalOpen}
@@ -72,6 +108,7 @@ const Drivers = () => {
           initialValues={editing || undefined}
           onSubmit={handleSubmit}
           onCancel={() => setModalOpen(false)}
+          submitting={submitting}
         />
       </Modal>
     </div>

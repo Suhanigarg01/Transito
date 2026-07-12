@@ -1,4 +1,5 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
+import { getCurrentUser, logout } from '../api/auth.api'
 import {
   DashboardIcon,
   VehiclesIcon,
@@ -39,8 +40,25 @@ const Wordmark = () => (
   </div>
 )
 
-/** The shared inner content, rendered in both the fixed rail and the mobile drawer. */
-const SidebarBody = ({ onNavigate }) => (
+const initialsOf = (name = '') =>
+  name
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase())
+    .join('') || 'U'
+
+const SidebarBody = ({ onNavigate }) => {
+  const navigate = useNavigate()
+  const user = getCurrentUser()
+
+  const handleLogout = () => {
+    logout()
+    onNavigate?.()
+    navigate('/login', { replace: true })
+  }
+
+  return (
   <div className="flex h-full flex-col">
     <div className="flex h-16 items-center px-5">
       <Wordmark />
@@ -68,24 +86,25 @@ const SidebarBody = ({ onNavigate }) => (
     <div className="border-t border-stone-200/80 p-3">
       <div className="flex items-center gap-3 rounded-lg px-2 py-2">
         <span className="flex h-9 w-9 items-center justify-center rounded-full bg-stone-200 text-xs font-semibold text-stone-600">
-          AM
+          {initialsOf(user?.name)}
         </span>
         <div className="min-w-0">
-          <p className="truncate text-sm font-medium text-stone-800">Asha Menon</p>
-          <p className="truncate text-xs text-stone-400">Fleet Manager</p>
+          <p className="truncate text-sm font-medium text-stone-800">{user?.name || 'Signed in'}</p>
+          <p className="truncate text-xs text-stone-400">{user?.roleLabel || ''}</p>
         </div>
       </div>
+      <button
+        onClick={handleLogout}
+        className="mt-1 w-full rounded-lg px-2 py-2 text-left text-sm font-medium text-stone-500 hover:bg-stone-100 hover:text-stone-800"
+      >
+        Sign out
+      </button>
     </div>
   </div>
-)
+  )
+}
 
-/**
- * App sidebar. Fixed rail on md+; a slide-in drawer on mobile.
- *
- * Props:
- *  - mobileOpen : boolean — drawer visibility on small screens
- *  - onClose()  : close the mobile drawer
- */
+
 const Sidebar = ({ mobileOpen = false, onClose }) => {
   return (
     <>

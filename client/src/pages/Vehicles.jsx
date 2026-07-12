@@ -1,33 +1,47 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import VehicleTable from '../features/vehicles/VehicleTable'
 import VehicleForm from '../features/vehicles/VehicleForm'
 import VehicleFilter from '../features/vehicles/VehicleFilter'
 import Modal from '../components/Modal'
 import PageHeader from '../components/PageHeader'
+import {
+  listVehicles,
+  createVehicle,
+  updateVehicle,
+  deleteVehicle,
+} from '../api/vehicles.api'
 
 /**
- * Vehicle registry page. Holds the list in local state so CRUD is interactive
- * in the demo; replace the seed + handlers with /api/vehicles calls.
+ * Vehicle registry page. Backed by /api/vehicles. The list is filtered
+ * client-side; CRUD round-trips to the server and reconciles local state from
+ * the response.
  */
-const SEED = [
-  { id: 1, regNumber: 'MH-12-AB-1234', make: 'Tata', model: 'LPT 1613', type: 'Truck', year: 2021, odometer: 84200, status: 'Available' },
-  { id: 2, regNumber: 'MH-14-CD-9911', make: 'Ashok Leyland', model: 'Dost', type: 'Van', year: 2022, odometer: 41230, status: 'On Trip' },
-  { id: 3, regNumber: 'MH-12-EF-5522', make: 'Eicher', model: 'Pro 2049', type: 'Truck', year: 2020, odometer: 122900, status: 'In Shop' },
-  { id: 4, regNumber: 'MH-01-GH-7788', make: 'Force', model: 'Traveller', type: 'Bus', year: 2019, odometer: 156700, status: 'Available' },
-]
-
 const Vehicles = () => {
-  const [vehicles, setVehicles] = useState(SEED)
+  const [vehicles, setVehicles] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [filters, setFilters] = useState({ search: '', status: '', type: '' })
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    listVehicles()
+      .then((data) => active && setVehicles(data))
+      .catch((err) => active && setError(err.message))
+      .finally(() => active && setLoading(false))
+    return () => {
+      active = false
+    }
+  }, [])
 
   const filtered = useMemo(() => {
     const q = filters.search.trim().toLowerCase()
     return vehicles.filter((v) => {
       if (filters.status && v.status !== filters.status) return false
       if (filters.type && v.type !== filters.type) return false
-      if (q && !`${v.regNumber} ${v.make} ${v.model}`.toLowerCase().includes(q)) return false
+      if (q && !`${v.regNumber} ${v.name || ''}`.toLowerCase().includes(q)) return false
       return true
     })
   }, [vehicles, filters])
@@ -42,20 +56,33 @@ const Vehicles = () => {
     setModalOpen(true)
   }
 
-  const handleSubmit = (values) => {
-    // Replace with POST /api/vehicles or PUT /api/vehicles/:id
-    if (editing) {
-      setVehicles((list) => list.map((v) => (v.id === editing.id ? { ...v, ...values } : v)))
-    } else {
-      setVehicles((list) => [...list, { ...values, id: Date.now() }])
+  const handleSubmit = async (values) => {
+    setSubmitting(true)
+    setError('')
+    try {
+      if (editing) {
+        const updated = await updateVehicle(editing.id, values)
+        setVehicles((list) => list.map((v) => (v.id === editing.id ? updated : v)))
+      } else {
+        const created = await createVehicle(values)
+        setVehicles((list) => [created, ...list])
+      }
+      setModalOpen(false)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSubmitting(false)
     }
-    setModalOpen(false)
   }
 
-  const handleDelete = (vehicle) => {
-    // Replace with DELETE /api/vehicles/:id
-    if (window.confirm(`Delete vehicle ${vehicle.regNumber}?`)) {
+  const handleDelete = async (vehicle) => {
+    if (!window.confirm(`Delete vehicle ${vehicle.regNumber}?`)) return
+    setError('')
+    try {
+      await deleteVehicle(vehicle.id)
       setVehicles((list) => list.filter((v) => v.id !== vehicle.id))
+    } catch (err) {
+      setError(err.message)
     }
   }
 
@@ -74,9 +101,19 @@ const Vehicles = () => {
         </button>
       </PageHeader>
 
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
       <VehicleFilter filters={filters} onChange={setFilters} />
 
-      <VehicleTable vehicles={filtered} onEdit={openEdit} onDelete={handleDelete} />
+      {loading ? (
+        <div className="h-64 animate-pulse rounded-2xl bg-stone-200/50" />
+      ) : (
+        <VehicleTable vehicles={filtered} onEdit={openEdit} onDelete={handleDelete} />
+      )}
 
       <Modal
         open={modalOpen}
@@ -87,6 +124,7 @@ const Vehicles = () => {
           initialValues={editing || undefined}
           onSubmit={handleSubmit}
           onCancel={() => setModalOpen(false)}
+          submitting={submitting}
         />
       </Modal>
     </div>

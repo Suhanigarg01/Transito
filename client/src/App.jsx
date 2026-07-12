@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import AppShell from './components/AppShell'
 import Login from './pages/Login'
+import Signup from './pages/Signup'
 import Dashboard from './pages/Dashboard'
 import Vehicles from './pages/Vehicles'
 import Drivers from './pages/Drivers'
@@ -16,8 +17,10 @@ const App = () => {
       <Routes>
         {/* Public */}
         <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />
 
-        {/* Authenticated app — everything inside the shell */}
+        {/* Authenticated app — everything inside the shell. AppShell guards
+            access, redirecting unauthenticated visitors to /login. */}
         <Route element={<AppShell />}>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<Dashboard />} />
