@@ -1,16 +1,15 @@
-# React + Vite
+# TransitOps: Smart Transport Operations Platform
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## 🚀 Overview
+Built for the Odoo Hackathon (8-hour duration), **TransitOps** is an end-to-end transport operations platform that digitizes vehicle, driver, dispatch, maintenance, and expense management. It is designed to replace manual spreadsheets and logbooks by providing a centralized hub that enforces strict business rules and offers real-time operational insights.
 
-Currently, two official plugins are available:
+## 👥 Target Users
+*   **Fleet Manager:** Oversees assets, maintenance schedules, and operational efficiency.
+*   **Driver:** Handles trips, vehicle assignments, and active deliveries.
+*   **Safety Officer:** Monitors driver compliance, license validity, and safety scores[cite: 1].
+*   **Financial Analyst:** Reviews operational expenses, fuel costs, and overall profitability[cite: 1].
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## 🛠 Tech Stack
+*   **Frontend:** React, JavaScript
+*   **Backend:** Node.js, Express
+*   **Database:** PostgreSQL / MySQL
